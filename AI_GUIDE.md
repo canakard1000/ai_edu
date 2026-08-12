@@ -56,9 +56,11 @@ The AI should behave like a careful teaching assistant: explain clearly, make sa
 ## Naver Blog Default Form Rule
 - For new Naver Blog posts, use the completed published post `천안아산역 카페 동선 추천 | 잠깐 쉬어가기 좋은 코스 정리` as the default structure.
 - Use `NAVER_BLOG_DEFAULT_FORM.md` as the reusable writing form before drafting a new post.
-- The default order is: title, intro, affiliate disclosure, body image 1, criteria section, route/core order section, body image 2, detailed criteria, monetization link intro, monetization link card 1, monetization link card 2, body image 3, closing, hashtags.
+- The default order is: title, intro, affiliate disclosure, body image 1, criteria section, route/core order section, body image 2, detailed criteria, monetization link intro, monetization link card 1, transition sentence, monetization link card 2, body image 3, closing, hashtags.
 - Body images are required. They must be separate from monetization link-card thumbnails.
 - Before showing a draft as complete, verify that the draft includes three article-matching body images and two monetization links.
+- Do not stack two monetization links without context; add a short transition sentence between them.
+- Hashtags should include location, place/topic, recommendation intent, and monetization-related keywords when appropriate.
 - Before publishing, verify the public post contains the same three body images and two monetization links.
 
 ## When a Problem Occurs
