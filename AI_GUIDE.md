@@ -73,6 +73,22 @@ Record the issue in a small, durable format:
 - Prevention: For Naver Blog posts, do not rely only on editor DOM anchor counts. Use screenshots or public post inspection after publishing.
 - Related files: Naver blog publishing workflow.
 
+### Incident: Missing Naver Blog Body Images
+- Symptom: A Naver Blog post was published with monetization link cards but without the planned body images.
+- Root cause: The publishing workflow checked text and monetization links but did not enforce the image-placement checklist before final publish.
+- Fix: Generate or prepare three article-matching images, upload them through the Naver editor, and update the post.
+- Verification: Confirm the public post contains the three uploaded body images, separate from monetization link preview thumbnails.
+- Prevention: Before publishing or updating a Naver Blog post, explicitly verify: intro image, middle route/context image, and closing image are present.
+- Related files: Naver blog publishing workflow.
+
+### Incident: Public Naver Screenshot Timeout
+- Symptom: Browser screenshot capture can time out on heavy Naver public post pages after image uploads.
+- Root cause: The page loads several Naver widgets, frames, lazy images, and link previews, which can make CDP screenshots unreliable.
+- Fix: Verify publication with URL, DOM snapshot, and public image URL extraction when screenshot capture fails.
+- Verification: Public DOM image extraction found the uploaded `postfiles.pstatic.net` image URLs.
+- Prevention: Treat screenshot as preferred visual proof, but fall back to DOM image count and image source verification when Naver screenshot capture times out.
+- Related files: Browser automation workflow and Naver blog verification.
+
 ### Incident: Browser DOM Node Click IDs
 - Symptom: Browser DOM click failed when `node_id` was passed as a number.
 - Root cause: The browser DOM control API expects `node_id` as a string.
