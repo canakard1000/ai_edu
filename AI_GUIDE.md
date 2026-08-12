@@ -106,6 +106,14 @@ Record the issue in a small, durable format:
 - Prevention: For each Naver Blog post, require visual variety. Do not reuse the same table/coffee composition unless the article specifically needs it. Choose images by section role: opening atmosphere, middle explanation, closing action.
 - Related files: Naver blog image generation workflow and `NAVER_BLOG_DEFAULT_FORM.md`.
 
+### Incident: Naver Editor Automation Friction
+- Symptom: Naver Smart Editor sometimes ignored long Korean typing, lost focus after image uploads, or produced stale DOM node IDs during link insertion.
+- Root cause: The editor is iframe-based, stateful, and partially canvas/React-driven, so direct DOM nodes can become stale and normal typing can fail after toolbar actions.
+- Fix: Use a stable workflow: click the target blank line, write text to the browser virtual clipboard, paste with `ControlOrMeta+V`, verify with DOM snapshot, then continue. For image uploads, use the photo button and a guarded file chooser promise. For link cards, use the top toolbar link button, search the URL, confirm the preview, then verify the product title and `toss.im` in the DOM.
+- Verification: Published post `224376921244` was verified with public HTML counts for title, disclosure, three body images, two Toss links, and eight hashtags.
+- Prevention: Do not rely on one long typing action in Naver editor. After every meaningful insertion, verify the editor DOM before continuing. Refresh visible DOM node IDs before clicking by node ID, and prefer coordinates only when the toolbar layout is visually confirmed.
+- Related files: Naver blog publishing workflow and browser automation workflow.
+
 ### Incident: Public Naver Screenshot Timeout
 - Symptom: Browser screenshot capture can time out on heavy Naver public post pages after image uploads.
 - Root cause: The page loads several Naver widgets, frames, lazy images, and link previews, which can make CDP screenshots unreliable.
