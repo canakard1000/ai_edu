@@ -65,6 +65,22 @@ Record the issue in a small, durable format:
 - Prevention: Before continuing work from older Korean documents, inspect a sample of the file first. If the text is corrupted, rebuild the template from the intended structure and save a clean copy.
 - Related files: Naver blog templates and Korean Markdown outputs.
 
+### Incident: Naver Blog Link Verification
+- Symptom: Naver editor link cards may not appear as normal `a[href]` anchors inside the editor DOM even after insertion.
+- Root cause: Naver Smart Editor stores link preview cards as editor components before publishing, so DOM anchor checks can return empty results.
+- Fix: Insert monetization URLs through the editor's link component, publish, then verify the public post visually and by URL.
+- Verification: Confirm both link preview cards are visible in the published post, not only in the editor.
+- Prevention: For Naver Blog posts, do not rely only on editor DOM anchor counts. Use screenshots or public post inspection after publishing.
+- Related files: Naver blog publishing workflow.
+
+### Incident: Browser DOM Node Click IDs
+- Symptom: Browser DOM click failed when `node_id` was passed as a number.
+- Root cause: The browser DOM control API expects `node_id` as a string.
+- Fix: Call DOM click with a string value, for example `{ node_id: "61" }`.
+- Verification: The publish settings panel opened after using a string node ID.
+- Prevention: When using `dom_cua` node IDs from visible DOM output, preserve them as strings.
+- Related files: Browser automation workflow.
+
 ## Repository Map
 - `main.py`: main executable or entry point.
 - `README.md`: human-facing project overview.
