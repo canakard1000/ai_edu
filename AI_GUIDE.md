@@ -26,6 +26,13 @@ The AI should behave like a careful teaching assistant: explain clearly, make sa
 - If a push fails, record the exact failing step and the reason so the same mistake is not repeated.
 - The default behavior for an explicit GitHub write request is action first, explanation second.
 
+## GitHub Approval Rule
+- Before committing or pushing durable guide updates to GitHub, show the completed content or diff to the user first.
+- Push only after the user confirms that the proposed update passes.
+- This approval step applies to guide changes, workflow rules, incident records, and other durable operating instructions.
+- Do not treat local preparation as final GitHub registration.
+- If the user asks for immediate code or publishing work, complete the work first, then show any proposed guide update separately before pushing it.
+
 ## Sync Preference
 - Prefer putting durable guidance into the repository itself, not only into local scratch files.
 - If a problem is discovered, update the guide in the same place where future sessions will read it.
