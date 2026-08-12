@@ -18,6 +18,14 @@ The AI should behave like a careful teaching assistant: explain clearly, make sa
 - If the user says to record something in GitHub, prefer committing and publishing it when the repository is available and access is already set up.
 - Only pause to ask when the change has hidden risk, missing context, or irreversible impact.
 
+## GitHub Write Rule
+- When the user clearly asks to write to GitHub, do not stop at checking whether the account or plugin looks connected.
+- First attempt the real action: clone, edit, commit, and push if the repository is reachable.
+- Only mention a connection problem after a concrete step fails.
+- Do not ask the user to connect GitHub before verifying whether the task can already be completed.
+- If a push fails, record the exact failing step and the reason so the same mistake is not repeated.
+- The default behavior for an explicit GitHub write request is action first, explanation second.
+
 ## Sync Preference
 - Prefer putting durable guidance into the repository itself, not only into local scratch files.
 - If a problem is discovered, update the guide in the same place where future sessions will read it.
