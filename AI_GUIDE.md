@@ -57,6 +57,14 @@ Record the issue in a small, durable format:
 - Prevention:
 - Related files:
 
+### Incident: Broken Korean Markdown Templates
+- Symptom: Previously generated Naver blog template files contained mojibake, so Korean headings and instructions were unreadable.
+- Root cause: The files were read or written with an encoding mismatch during an earlier workflow.
+- Fix: Create clean replacement templates instead of reusing the corrupted text directly.
+- Verification: Open the generated Markdown and confirm Korean text renders normally before using it as a writing source.
+- Prevention: Before continuing work from older Korean documents, inspect a sample of the file first. If the text is corrupted, rebuild the template from the intended structure and save a clean copy.
+- Related files: Naver blog templates and Korean Markdown outputs.
+
 ## Repository Map
 - `main.py`: main executable or entry point.
 - `README.md`: human-facing project overview.
