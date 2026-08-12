@@ -98,6 +98,14 @@ Record the issue in a small, durable format:
 - Prevention: Before publishing or updating a Naver Blog post, explicitly verify: intro image, middle route/context image, and closing image are present.
 - Related files: Naver blog publishing workflow.
 
+### Incident: Repetitive Naver Blog Image Style
+- Symptom: New Naver Blog draft images repeated the same coffee-table visual style, making the post feel predictable and less engaging.
+- Root cause: The image workflow followed the article mood but did not check visual variety across posts and across the three images in the same post.
+- Fix: Replace repetitive cafe-table images with distinct scenes that match each section: station movement, waiting-time planning, and ready-to-leave preparation.
+- Verification: Confirm the three selected images use different settings, compositions, and objects before showing the draft as complete.
+- Prevention: For each Naver Blog post, require visual variety. Do not reuse the same table/coffee composition unless the article specifically needs it. Choose images by section role: opening atmosphere, middle explanation, closing action.
+- Related files: Naver blog image generation workflow and `NAVER_BLOG_DEFAULT_FORM.md`.
+
 ### Incident: Public Naver Screenshot Timeout
 - Symptom: Browser screenshot capture can time out on heavy Naver public post pages after image uploads.
 - Root cause: The page loads several Naver widgets, frames, lazy images, and link previews, which can make CDP screenshots unreliable.
