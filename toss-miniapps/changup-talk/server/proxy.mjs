@@ -4,6 +4,14 @@ import path from 'node:path';
 
 const port = Number(process.env.PORT || 8787);
 const dotenvFiles = ['.env.local', '.env'];
+const defaultBases = {
+  sbdc: 'http://apis.data.go.kr/B553077/api/open/sdsc2',
+  reb: 'https://www.reb.or.kr/r-one/openapi',
+  kosis: 'https://kosis.kr/openapi',
+  ftc: 'https://apis.data.go.kr/1130000/FftcbrandfrcsbzmnothctinfoService'
+};
+
+const ftcOperationPath = '/getbrandFrcsBzmnOthctinfo';
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -34,16 +42,44 @@ for (const fileName of dotenvFiles) {
   loadEnvFile(path.resolve(process.cwd(), fileName));
 }
 
-const sbdcBase = process.env.SBDC_API_BASE_URL || 'http://apis.data.go.kr/B553077/api/open/sdsc2';
-const rebBase = process.env.REB_API_BASE_URL || 'https://www.reb.or.kr/r-one/openapi';
-const kosisBase = process.env.KOSIS_API_BASE_URL || 'https://kosis.kr/openapi';
-const ftcBase = process.env.FTC_API_BASE_URL || '';
+function normalizeBaseUrl(service, rawValue) {
+  if (!rawValue) {
+    return defaultBases[service];
+  }
+
+  try {
+    const parsed = new URL(rawValue);
+    const looksLikePage = parsed.hash.length > 0
+      || /\/portal\/|\/serviceUse\/|ActKeyPage|serviceUseUnityReg|Detail\.do$/i.test(parsed.pathname)
+      || parsed.pathname === '/' || parsed.pathname === '';
+    return looksLikePage ? defaultBases[service] : rawValue;
+  } catch {
+    return defaultBases[service];
+  }
+}
+
+function normalizeApiKey(rawValue) {
+  if (!rawValue) {
+    return '';
+  }
+
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    return rawValue;
+  }
+}
+
+const sbdcBase = normalizeBaseUrl('sbdc', process.env.SBDC_API_BASE_URL);
+const rebBase = normalizeBaseUrl('reb', process.env.REB_API_BASE_URL);
+const kosisBase = normalizeBaseUrl('kosis', process.env.KOSIS_API_BASE_URL);
+const ftcBase = normalizeBaseUrl('ftc', process.env.FTC_API_BASE_URL);
 
 const keys = {
-  sbdc: process.env.SBDC_API_KEY || process.env.VITE_SBDC_API_KEY || '',
-  reb: process.env.REB_API_KEY || process.env.VITE_REB_API_KEY || '',
-  kosis: process.env.KOSIS_API_KEY || process.env.VITE_KOSIS_API_KEY || '',
-  ftc: process.env.FTC_API_KEY || process.env.VITE_FTC_API_KEY || ''
+  sbdc: normalizeApiKey(process.env.SBDC_API_KEY || process.env.VITE_SBDC_API_KEY || ''),
+  reb: normalizeApiKey(process.env.REB_API_KEY || process.env.VITE_REB_API_KEY || ''),
+  kosis: normalizeApiKey(process.env.KOSIS_API_KEY || process.env.VITE_KOSIS_API_KEY || ''),
+  ftc: normalizeApiKey(process.env.FTC_API_KEY || process.env.VITE_FTC_API_KEY || '')
 };
 
 function withCors(res) {
@@ -67,10 +103,11 @@ function maskedStatus() {
   };
 }
 
-async function proxyRequest(req, res, baseUrl, key) {
+async function proxyRequest(req, res, baseUrl, key, pathnameOverride = null) {
   const requestUrl = new URL(req.url, `http://${req.headers.host}`);
   const upstream = new URL(baseUrl);
-  upstream.pathname = `${upstream.pathname.replace(/\/$/, '')}${requestUrl.pathname}`;
+  const requestPath = pathnameOverride ?? requestUrl.pathname;
+  upstream.pathname = `${upstream.pathname.replace(/\/$/, '')}${requestPath}`;
   upstream.search = requestUrl.search;
 
   if (key && !upstream.searchParams.has('serviceKey')) {
@@ -94,6 +131,32 @@ async function proxyRequest(req, res, baseUrl, key) {
   res.end(body);
 }
 
+async function probeUrl(urlString, keyName, key, extraParams = {}) {
+  const url = new URL(urlString);
+  Object.entries(extraParams).forEach(([name, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(name, String(value));
+    }
+  });
+  if (key) {
+    url.searchParams.set(keyName, key);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json, text/xml;q=0.9, */*;q=0.8'
+    }
+  });
+  const body = await response.text();
+  return {
+    url: url.toString(),
+    status: response.status,
+    ok: response.ok,
+    contentType: response.headers.get('content-type') || '',
+    bodyPreview: body.slice(0, 500)
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   withCors(res);
   if (req.method === 'OPTIONS') {
@@ -107,6 +170,51 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/health') {
       sendJson(res, 200, { ok: true, keys: maskedStatus() });
+      return;
+    }
+
+    if (url.pathname === '/probe/sbdc') {
+      const result = await probeUrl(`${sbdcBase.replace(/\/$/, '')}/storeZoneOne`, 'serviceKey', keys.sbdc, {
+        key: '9174',
+        type: 'json'
+      });
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (url.pathname === '/probe/reb') {
+      const result = await probeUrl(`${rebBase.replace(/\/$/, '')}/SttsApiTblData.do`, 'KEY', keys.reb, {
+        STATBL_ID: 'A_2024_00903',
+        DTACYCLE_CD: 'MM',
+        CLS_ID: '500001',
+        ITM_ID: '100001',
+        START_WRTTIME: '2025',
+        Type: 'json'
+      });
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (url.pathname === '/probe/kosis') {
+      const result = await probeUrl(`${kosisBase.replace(/\/$/, '')}/statisticsList.do`, 'apiKey', keys.kosis, {
+        method: 'getList',
+        vwCd: 'MT_ZTITLE',
+        parentId: 'A',
+        format: 'json'
+      });
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (url.pathname === '/probe/ftc') {
+      const result = await probeUrl(`${ftcBase.replace(/\/$/, '')}${ftcOperationPath}`, 'serviceKey', keys.ftc, {
+        pageNo: '1',
+        numOfRows: '10',
+        resultType: 'json',
+        jngBizCrtraYr: '2017',
+        brandMnno: 'BRD_20080100007'
+      });
+      sendJson(res, 200, result);
       return;
     }
 
@@ -131,6 +239,11 @@ const server = http.createServer(async (req, res) => {
           error: 'FTC_API_BASE_URL not configured',
           message: '공정거래위원회 API의 실제 스펙이 확인된 뒤 서버 비밀값으로 연결하세요.'
         });
+        return;
+      }
+
+      if (url.pathname === '/ftc/franchise-info' || url.pathname === '/ftc/getbrandFrcsBzmnOthctinfo') {
+        await proxyRequest(req, res, ftcBase, keys.ftc, ftcOperationPath);
         return;
       }
 
