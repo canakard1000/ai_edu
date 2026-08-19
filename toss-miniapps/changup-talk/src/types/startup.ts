@@ -5,8 +5,33 @@ export type StartupMode =
   | '1인·소자본 창업'
   | '프랜차이즈';
 
+export type DataSource = 'real' | 'cached' | 'regional' | 'mock';
 export type AnalysisPhase = 'idle' | 'loading' | 'ready' | 'error';
-export type DataSource = 'mock' | 'api';
+
+export interface SourceMeta {
+  source: DataSource;
+  label: string;
+  basisDate: string;
+  isEstimated: boolean;
+  reliability: number;
+  details: string;
+}
+
+export interface AnalysisConfidence {
+  overall: number;
+  rent: number;
+  competition: number;
+  demand: number;
+  startupCost: number;
+  salesForecast: number;
+  reasonSummary: string[];
+}
+
+export interface CostBand {
+  min: number;
+  base: number;
+  max: number;
+}
 
 export interface IndustryProfile {
   id: string;
@@ -40,6 +65,16 @@ export interface IndustryProfile {
   operationalComplexity: number;
 }
 
+export interface ActualQuoteOverrides {
+  actualDeposit?: number;
+  actualMonthlyRent?: number;
+  actualPremium?: number;
+  actualInteriorCost?: number;
+  actualEquipmentCost?: number;
+  actualStaffCount?: number;
+  actualLaborCost?: number;
+}
+
 export interface StartupInputs {
   province: string;
   district: string;
@@ -56,10 +91,22 @@ export interface StartupInputs {
   operationHours: string;
   secondaryDistrict: string;
   comparisonArea: string;
+  actualQuotes: ActualQuoteOverrides;
+}
+
+export interface RegionalStatisticsSnapshot {
+  sourceMeta: SourceMeta;
+  floatingPopulation: number;
+  householdDensity: number;
+  commercialDensity: number;
+  youngPopulationRate: number;
+  apartmentDensity: number;
+  businessDensity: number;
+  summary: string;
 }
 
 export interface CommercialDistrictContext {
-  dataSource: DataSource;
+  sourceMeta: SourceMeta;
   province: string;
   district: string;
   neighborhood: string;
@@ -77,6 +124,7 @@ export interface CommercialDistrictContext {
   reasonSummary: string[];
   notes: string;
   updatedAt: string;
+  regionStatistics: RegionalStatisticsSnapshot;
 }
 
 export interface StartupCostBreakdown {
@@ -114,7 +162,18 @@ export interface ScenarioResult {
   operatingProfit: number;
   breakEvenBufferRate: number;
   paybackMonths: number | null;
+  cashFlow: number;
   notes: string[];
+}
+
+export interface StressTestScenario {
+  label: string;
+  salesMultiplier: number;
+  sales: number;
+  operatingProfit: number;
+  breakEvenSales: number;
+  cashFlow: number;
+  paybackMonths: number | null;
 }
 
 export interface ScoringFactor {
@@ -131,25 +190,36 @@ export interface ScoringSummary {
   warnings: string[];
 }
 
+export interface RecommendationCandidate {
+  profile: IndustryProfile;
+  analysis: AnalysisResult;
+  orderScore: number;
+  suitabilityNote: string;
+  reasons: string[];
+}
+
 export interface AnalysisResult {
-  source: DataSource;
+  sourceMeta: SourceMeta;
   profile: IndustryProfile;
   context: CommercialDistrictContext;
+  confidence: AnalysisConfidence;
   breakdown: StartupCostBreakdown;
+  salesBand: CostBand;
+  costBand: {
+    deposit: CostBand;
+    monthlyRent: CostBand;
+    interior: CostBand;
+    equipment: CostBand;
+    totalInvestment: CostBand;
+  };
   scenarios: ScenarioResult[];
+  stressTests: StressTestScenario[];
   scoring: ScoringSummary;
   risks: string[];
   suggestions: string[];
   capitalGap: number;
   affiliateNotice: string;
-}
-
-export interface ReverseCandidate {
-  profile: IndustryProfile;
-  analysis: AnalysisResult;
-  affordabilityScore: number;
-  operatingDifficulty: number;
-  suitabilityNote: string;
+  dataTrace: SourceMeta[];
 }
 
 export interface ComparisonResult {

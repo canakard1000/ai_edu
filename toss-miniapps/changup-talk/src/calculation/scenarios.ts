@@ -23,6 +23,7 @@ export function buildScenarioResults(breakdown: StartupCostBreakdown): ScenarioR
     const operatingProfit = sales - variableCost - fixedCost;
     const breakEvenSales = calculateBreakEvenSales(fixedCost, variableRate);
     const breakEvenBufferRate = breakEvenSales > 0 ? ((sales - breakEvenSales) / breakEvenSales) * 100 : 0;
+    const cashFlow = operatingProfit - breakdown.workingCapital / 12;
 
     return {
       label: scenario.label,
@@ -31,6 +32,7 @@ export function buildScenarioResults(breakdown: StartupCostBreakdown): ScenarioR
       operatingProfit,
       breakEvenBufferRate,
       paybackMonths: operatingProfit > 0 ? breakdown.totalInvestment / operatingProfit : null,
+      cashFlow,
       notes: [
         `매출 배수 ${scenario.salesMultiplier.toFixed(2)} 적용`,
         `비용 배수 ${scenario.costMultiplier.toFixed(2)} 적용`,

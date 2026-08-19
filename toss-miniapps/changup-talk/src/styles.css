@@ -157,12 +157,15 @@ button {
 
 .mini-banner {
   flex: 1 1 280px;
+  min-width: 0;
   padding: 16px;
 }
 
 .mini-banner strong {
   display: block;
   margin-top: 8px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mini-banner p,
@@ -172,6 +175,11 @@ button {
 .comparison-card p {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.mini-banner p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .card {
@@ -456,6 +464,10 @@ input[type='range'] {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .mini-banner {
+    flex: 1 1 100%;
   }
 
   .topbar-title {
