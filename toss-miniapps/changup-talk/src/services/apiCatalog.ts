@@ -30,7 +30,7 @@ export const PUBLIC_API_SOURCES: PublicApiSource[] = [
   {
     name: 'KOSIS 지역 통계',
     applicationUrl: 'https://kosis.kr/serviceInfo/openAPIGuide.do',
-    endpoint: 'https://kosis.kr/openapi/statisticsSearch.do?method=getList',
+    endpoint: 'https://kosis.kr/openapi/statisticsList.do?method=getList / https://kosis.kr/openapi/statisticsSearch.do?method=getList / https://kosis.kr/openapi/statisticsData.do?method=getList',
     access: 'free',
     approval: 'automatic',
     envVars: ['VITE_KOSIS_API_URL', 'VITE_KOSIS_API_KEY', 'VITE_API_PROXY_BASE_URL'],
@@ -39,7 +39,7 @@ export const PUBLIC_API_SOURCES: PublicApiSource[] = [
   {
     name: '공정거래위원회 가맹사업정보',
     applicationUrl: 'https://www.data.go.kr/data/15125478/openapi.do',
-    endpoint: '',
+    endpoint: 'data.go.kr OpenAPI Swagger 명세 기반',
     access: 'free',
     approval: 'review',
     envVars: ['VITE_FTC_API_URL', 'VITE_FTC_API_KEY', 'VITE_API_PROXY_BASE_URL'],
