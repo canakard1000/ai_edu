@@ -414,6 +414,11 @@ input[type='range'] {
   gap: 10px;
 }
 
+.candidate-card.selected {
+  border-color: rgba(56, 199, 255, 0.5);
+  background: linear-gradient(180deg, rgba(19, 31, 65, 0.98), rgba(12, 18, 41, 0.98));
+}
+
 .candidate-metrics {
   display: flex;
   flex-wrap: wrap;
@@ -443,6 +448,28 @@ input[type='range'] {
 
 .status-text.error {
   color: var(--bad);
+}
+
+.mini-plan {
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mini-plan strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.mini-plan span {
+  display: block;
+  color: var(--accent-2);
+  margin-bottom: 6px;
+}
+
+.brand-detail-card {
+  margin-top: 12px;
 }
 
 .danger-card {

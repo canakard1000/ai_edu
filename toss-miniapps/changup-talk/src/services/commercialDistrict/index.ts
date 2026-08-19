@@ -10,6 +10,7 @@ import type {
 import { readCache, writeCache } from '../cache';
 import { resolveWithFallback } from '../fallback';
 import { getRegionStatistics, resolveRegionStatistics } from '../statistics';
+import { dedupePromise } from '../requestPool';
 
 type DistrictApiPayload = {
   depositPerPyeong?: number;
@@ -206,7 +207,7 @@ export async function resolveCommercialDistrictContext(
   profile: IndustryProfile
 ): Promise<CommercialDistrictContext> {
   const cacheKey = `${CACHE_KEY_PREFIX}${inputs.province}:${inputs.district}:${inputs.neighborhood}:${profile.id}`;
-  const result = await resolveWithFallback<CommercialDistrictContext>({
+  const result = await dedupePromise(cacheKey, () => resolveWithFallback<CommercialDistrictContext>({
     cacheKey,
     sourceLabel: '소상공인시장진흥공단 상가(상권)정보',
     basisDate: TODAY,
@@ -226,7 +227,7 @@ export async function resolveCommercialDistrictContext(
       regional: '전국 지역 구조를 사용한 지역 fallback',
       mock: '기본 mock 상권 모델'
     }
-  });
+  }));
 
   return result.data;
 }

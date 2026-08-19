@@ -17,6 +17,86 @@ export interface SourceMeta {
   details: string;
 }
 
+export type BrandCategory =
+  | '카페'
+  | '치킨'
+  | '한식'
+  | '분식'
+  | '피자'
+  | '베이커리'
+  | '배달'
+  | '무인'
+  | '교육'
+  | '서비스'
+  | '기타';
+
+export type PartnershipType = 'none' | 'affiliate' | 'advertising' | 'both';
+
+export type EntitlementPlan = 'FREE' | 'ANALYSIS_3' | 'ANALYSIS_20' | 'PRO';
+
+export type RevenueEventType = 'AD' | 'ANALYSIS_PASS' | 'PRO' | 'LEAD' | 'CONTRACT_COMMISSION' | 'PREMIUM_PLACEMENT';
+
+export type LeadStatus = 'requested' | 'accepted' | 'contacted' | 'visited' | 'contracted' | 'cancelled' | 'invalid';
+
+export interface BrandRecord {
+  brandId: string;
+  brandName: string;
+  category: BrandCategory;
+  industryId: string;
+  industryName: string;
+  franchiseHead: string;
+  sourceMeta: SourceMeta;
+  isRealData: boolean;
+  isPartner: boolean;
+  partnershipType: PartnershipType;
+  franchiseFee: number | null;
+  educationFee: number | null;
+  deposit: number | null;
+  otherCost: number | null;
+  totalStartupCost: CostBand | null;
+  note: string;
+}
+
+export interface BrandComparisonRow {
+  brandId: string;
+  brandName: string;
+  category: BrandCategory;
+  sourceMeta: SourceMeta;
+  isRealData: boolean;
+  isPartner: boolean;
+  partnershipType: PartnershipType;
+  fee: number | null;
+  educationFee: number | null;
+  deposit: number | null;
+  otherCost: number | null;
+  totalStartupCost: number | null;
+  capitalGap: number;
+}
+
+export interface UsageSnapshot {
+  userId: string;
+  freeLimit: number;
+  freeUsed: number;
+  purchasedPasses: number;
+  purchasedUsed: number;
+  lastPurchasedPlan?: EntitlementPlan;
+  previewOnly: boolean;
+  updatedAt: string;
+}
+
+export interface LeadRecord {
+  leadId: string;
+  userId: string;
+  brandId: string;
+  desiredRegion: string;
+  availableCapital: number;
+  desiredArea: number;
+  contactConsent: boolean;
+  thirdPartyConsent: boolean;
+  createdAt: string;
+  status: LeadStatus;
+}
+
 export interface AnalysisConfidence {
   overall: number;
   rent: number;

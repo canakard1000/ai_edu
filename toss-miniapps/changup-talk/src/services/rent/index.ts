@@ -1,6 +1,7 @@
 import { APP_ENV } from '../config';
 import type { CommercialDistrictContext, SourceMeta } from '../../types/startup';
 import { readCache, writeCache } from '../cache';
+import { dedupePromise } from '../requestPool';
 
 export interface RentSnapshot {
   sourceMeta: SourceMeta;
@@ -76,20 +77,22 @@ function mockRent(context: CommercialDistrictContext): RentSnapshot {
 
 export async function resolveRentSnapshot(context: CommercialDistrictContext): Promise<RentSnapshot> {
   const cacheKey = `${CACHE_KEY_PREFIX}${context.province}:${context.district}:${context.neighborhood}`;
-  try {
-    return await fetchRealRent(context);
-  } catch {
-    const cached = readCache<RentSnapshot>(cacheKey);
-    if (cached?.data) {
-      return {
-        ...cached.data,
-        source: 'cached',
-        sourceMeta: meta('cached', 88, '캐시된 임대 데이터', '이전 실데이터를 브라우저 캐시에 보관', true)
-      };
-    }
+  return dedupePromise(cacheKey, async () => {
+    try {
+      return await fetchRealRent(context);
+    } catch {
+      const cached = readCache<RentSnapshot>(cacheKey);
+      if (cached?.data) {
+        return {
+          ...cached.data,
+          source: 'cached',
+          sourceMeta: meta('cached', 88, '캐시된 임대 데이터', '이전 실데이터를 브라우저 캐시에 보관', true)
+        };
+      }
 
-    return context.rentIndex >= 0.9 ? regionalRent(context) : mockRent(context);
-  }
+      return context.rentIndex >= 0.9 ? regionalRent(context) : mockRent(context);
+    }
+  });
 }
 
 export function getRentSnapshot(context: CommercialDistrictContext): RentSnapshot {

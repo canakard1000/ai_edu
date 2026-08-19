@@ -1,6 +1,7 @@
 import { APP_ENV } from '../config';
 import type { RegionalStatisticsSnapshot, SourceMeta } from '../../types/startup';
 import { readCache, writeCache } from '../cache';
+import { dedupePromise } from '../requestPool';
 
 export interface RegionStatistics extends RegionalStatisticsSnapshot {
   source: 'real' | 'cached' | 'regional' | 'mock';
@@ -88,19 +89,21 @@ async function fetchRealStatistics(province: string, district: string): Promise<
 
 export async function resolveRegionStatistics(province: string, district: string): Promise<RegionStatistics> {
   const cacheKey = `${CACHE_KEY_PREFIX}${province}:${district}`;
-  try {
-    return await fetchRealStatistics(province, district);
-  } catch {
-    const cached = readCache<RegionStatistics>(cacheKey);
-    if (cached?.data) {
-      return {
-        ...cached.data,
-        source: 'cached',
-        sourceMeta: meta('cached', 88, '캐시된 지역 통계', '이전 실데이터를 브라우저 캐시에 저장', true)
-      };
+  return dedupePromise(cacheKey, async () => {
+    try {
+      return await fetchRealStatistics(province, district);
+    } catch {
+      const cached = readCache<RegionStatistics>(cacheKey);
+      if (cached?.data) {
+        return {
+          ...cached.data,
+          source: 'cached',
+          sourceMeta: meta('cached', 88, '캐시된 지역 통계', '이전 실데이터를 브라우저 캐시에 저장', true)
+        };
+      }
+      return regionalStatistics(province, district);
     }
-    return regionalStatistics(province, district);
-  }
+  });
 }
 
 export function getRegionStatistics(province: string, district: string): RegionStatistics {

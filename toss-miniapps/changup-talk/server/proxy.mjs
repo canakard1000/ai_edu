@@ -34,6 +34,7 @@ const ftcBrandByIndustry = {
   burger: 'BRD_20080100007'
 };
 const upstreamResponseCache = new Map();
+const inflightFetches = new Map();
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -116,6 +117,26 @@ function clamp(value, min, max) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfter(value) {
+  if (!value) return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return Math.max(0, numeric * 1000);
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isFinite(timestamp)) {
+    return Math.max(0, timestamp - Date.now());
+  }
+  return null;
+}
+
+function serializeHeaders(headers) {
+  return Object.entries(headers)
+    .map(([key, value]) => `${key.toLowerCase()}:${value}`)
+    .sort()
+    .join('|');
 }
 
 function hashString(input) {
@@ -219,7 +240,7 @@ function extractTotalCount(payload) {
 
 const FETCH_RETRY_DELAYS_MS = [1500, 4500, 12000];
 
-async function fetchJson(url, headers = {}, attempt = 0) {
+async function fetchJsonInternal(url, headers = {}, attempt = 0) {
   const response = await fetch(url, {
     headers: {
       accept: 'application/json, text/xml;q=0.9, */*;q=0.8',
@@ -258,8 +279,9 @@ async function fetchJson(url, headers = {}, attempt = 0) {
     }
   }
   if ((response.status === 429 || response.status >= 500) && attempt < FETCH_RETRY_DELAYS_MS.length) {
-    await sleep(FETCH_RETRY_DELAYS_MS[attempt]);
-    return fetchJson(url, headers, attempt + 1);
+    const retryAfterMs = response.status === 429 ? parseRetryAfter(response.headers.get('retry-after')) : null;
+    await sleep(retryAfterMs ?? FETCH_RETRY_DELAYS_MS[attempt]);
+    return fetchJsonInternal(url, headers, attempt + 1);
   }
   let json = null;
   if (/json/i.test(contentType) || body.trim().startsWith('{') || body.trim().startsWith('[')) {
@@ -274,6 +296,22 @@ async function fetchJson(url, headers = {}, attempt = 0) {
     body,
     json
   };
+}
+
+async function fetchJson(url, headers = {}, attempt = 0) {
+  const key = `${url}|${serializeHeaders(headers)}|${attempt}`;
+  const existing = inflightFetches.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = fetchJsonInternal(url, headers, attempt).finally(() => {
+    if (inflightFetches.get(key) === promise) {
+      inflightFetches.delete(key);
+    }
+  });
+  inflightFetches.set(key, promise);
+  return promise;
 }
 
 async function fetchSbdcJson(pathname, query = {}) {

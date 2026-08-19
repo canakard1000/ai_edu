@@ -1,10 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { calculateStartupAnalysis, buildAlternativeRecommendations } from './calculation';
 import { INDUSTRY_GROUPS, INDUSTRY_PROFILES, getIndustriesByGroup } from './data/industries';
+import { BRAND_CATEGORY_GROUPS } from './data/brands';
 import { getCommercialAreaHints, getNeighborhoodHints, getRegionHints, REGION_PROVINCES } from './data/regions';
 import { APP_ENV } from './services/config';
+import { inferBrandCategory, resolveBrandComparison, resolveBrandRecord } from './services/brands';
+import { getRemainingAnalyses, getUsageSnapshot, grantAnalysisPass, recordAnalysisUse } from './services/usage';
 import type {
   AnalysisResult,
+  BrandCategory,
+  BrandComparisonRow,
+  BrandRecord,
   ComparisonResult,
   RecommendationCandidate,
   StartupInputs,
@@ -12,7 +18,7 @@ import type {
 import { formatCompactWon, formatDelta, formatMonths, formatPercent, formatScore, formatWon } from './utils/currency';
 import './styles.css';
 
-type Screen = 'home' | 'analysis' | 'search' | 'compare';
+type Screen = 'home' | 'analysis' | 'search' | 'compare' | 'brand';
 type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 const STEP_TITLES = ['지역', '창업형태', '업종', '면적', '보유자금', '운영조건', '분석'];
@@ -80,10 +86,17 @@ function App() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationCandidate[]>([]);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [usage, setUsage] = useState(() => getUsageSnapshot());
+  const [brandCategory, setBrandCategory] = useState<BrandCategory>('카페');
+  const [brandRecords, setBrandRecords] = useState<BrandRecord[]>([]);
+  const [brandComparison, setBrandComparison] = useState<BrandComparisonRow[]>([]);
+  const [brandSelected, setBrandSelected] = useState<BrandRecord | null>(null);
+  const [brandStatus, setBrandStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [message, setMessage] = useState('모바일 우선 레이아웃으로 준비되었습니다.');
   const latestInputsRef = useRef(inputs);
   const latestRouteRef = useRef({ screen, step });
+  const lastUsageKeyRef = useRef('');
 
   const selectedProfile = useMemo(
     () => INDUSTRY_PROFILES.find((profile) => profile.id === inputs.industryId) ?? INDUSTRY_PROFILES[0],
@@ -137,6 +150,20 @@ function App() {
 
     let cancelled = false;
     setStatus('loading');
+    const usageKey = JSON.stringify({
+      province: inputs.province,
+      district: inputs.district,
+      neighborhood: inputs.neighborhood,
+      area: inputs.areaPyeong,
+      industryId: inputs.industryId,
+      mode: inputs.mode,
+      capital: inputs.availableCapital,
+      quotes: inputs.actualQuotes
+    });
+    if (usageKey !== lastUsageKeyRef.current) {
+      lastUsageKeyRef.current = usageKey;
+      setUsage((current) => recordAnalysisUse(current));
+    }
 
     (async () => {
       try {
@@ -236,6 +263,50 @@ function App() {
     };
   }, [inputs, screen, selectedProfile]);
 
+  useEffect(() => {
+    if (screen !== 'brand') {
+      return;
+    }
+
+    let cancelled = false;
+    setBrandStatus('loading');
+    setBrandSelected(null);
+    setBrandRecords([]);
+    setBrandComparison([]);
+
+    const categoryGroup = BRAND_CATEGORY_GROUPS.find((item) => item.category === brandCategory) ?? BRAND_CATEGORY_GROUPS[0];
+    const profiles = categoryGroup.profileIds
+      .map((profileId) => INDUSTRY_PROFILES.find((profile) => profile.id === profileId))
+      .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
+
+    if (profiles.length === 0) {
+      setBrandStatus('error');
+      setMessage('브랜드 카테고리 데이터가 아직 비어 있습니다.');
+      return;
+    }
+
+    (async () => {
+      try {
+        const details = await Promise.all(profiles.map(async (profile) => resolveBrandRecord(profile)));
+        const comparisonRows = await resolveBrandComparison(profiles.slice(0, 3), inputs.availableCapital);
+        if (cancelled) return;
+        setBrandRecords(details);
+        setBrandComparison(comparisonRows);
+        setBrandSelected((current) => current ?? details[0] ?? null);
+        setBrandStatus('ready');
+        setMessage(`${brandCategory} 브랜드 탐색을 불러왔습니다.`);
+      } catch (error) {
+        if (cancelled) return;
+        setBrandStatus('error');
+        setMessage(error instanceof Error ? error.message : '브랜드 탐색 중 오류가 발생했습니다.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandCategory, inputs.availableCapital, screen]);
+
   function updateInput<K extends keyof StartupInputs>(key: K, value: StartupInputs[K]) {
     setInputs((current) => ({ ...current, [key]: value }));
   }
@@ -292,6 +363,13 @@ function App() {
     navigate('compare', 0);
   }
 
+  function onBrandBrowse(category?: BrandCategory) {
+    if (category) {
+      setBrandCategory(category);
+    }
+    navigate('brand', 0);
+  }
+
   function onHome() {
     navigate('home', 0);
   }
@@ -308,6 +386,49 @@ function App() {
         [key]: value
       }
     }));
+  }
+
+  function renderEntitlementCard() {
+    const remaining = getRemainingAnalyses(usage);
+    const hasPaidPass = usage.purchasedPasses - usage.purchasedUsed > 0;
+
+    return (
+      <section className="card">
+        <span className="eyebrow">정밀분석 이용권</span>
+        <h2>무료 1회 사용 후에는 이용권이 필요합니다.</h2>
+        <p>
+          현재 남은 정밀분석 횟수는 <strong>{remaining}</strong>회입니다.
+          {hasPaidPass ? ' 구매한 이용권이 남아 있습니다.' : ' 구매한 이용권은 아직 없습니다.'}
+        </p>
+        <div className="grid two-col">
+          <article className="mini-plan">
+            <strong>정밀분석 3회</strong>
+            <span>1,000원</span>
+            <p>실제 결제는 아직 연결하지 않았습니다.</p>
+          </article>
+          <article className="mini-plan">
+            <strong>정밀분석 20회</strong>
+            <span>가격 미확정</span>
+            <p>향후 운영용 상품 ID를 환경변수로만 연결합니다.</p>
+          </article>
+        </div>
+        {import.meta.env.DEV ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              const next = grantAnalysisPass('ANALYSIS_3', 3);
+              setUsage(next);
+              setMessage('개발모드 미리보기로 이용권이 추가되었습니다.');
+            }}
+          >
+            [개발모드] 이용권 미리보기
+          </button>
+        ) : (
+          <p className="mock-label">운영 앱에서는 가짜 결제 성공을 만들지 않습니다.</p>
+        )}
+      </section>
+    );
   }
 
   function renderAnalysisHeader() {
@@ -333,6 +454,15 @@ function App() {
           <button className="secondary-button" type="button" onClick={() => setInputs((current) => ({ ...current }))}>
             다시 계산
           </button>
+          {isBelowB(analysis.scoring.grade) && (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => onBrandBrowse(inferBrandCategory(analysis.profile))}
+            >
+              추천 업종의 창업 브랜드 보기
+            </button>
+          )}
         </div>
       </section>
     );
@@ -833,6 +963,113 @@ function App() {
     );
   }
 
+  function renderBrand() {
+    const categoryGroup = BRAND_CATEGORY_GROUPS.find((item) => item.category === brandCategory) ?? BRAND_CATEGORY_GROUPS[0];
+    const remaining = getRemainingAnalyses(usage);
+
+    return (
+      <section className="card">
+        <h2>창업 브랜드 찾아보기</h2>
+        <p>공정위 실데이터가 연결되는 브랜드만 숫자를 보여주고, 제휴/광고 표시는 별도로 분리합니다.</p>
+        {brandStatus === 'loading' && <p className="status-text">브랜드 데이터를 불러오는 중입니다...</p>}
+        {brandStatus === 'error' && <p className="status-text error">브랜드 데이터를 불러오지 못했습니다.</p>}
+        <div className="stepper">
+          {BRAND_CATEGORY_GROUPS.map((group) => (
+            <button
+              key={group.category}
+              type="button"
+              className={`step-chip ${brandCategory === group.category ? 'active' : ''}`}
+              onClick={() => setBrandCategory(group.category)}
+            >
+              {group.title}
+            </button>
+          ))}
+        </div>
+        <div className="hint-box">{categoryGroup.description}</div>
+        <div className="metric-grid compact">
+          <Metric label="남은 정밀분석" value={`${remaining}회`} />
+          <Metric label="무료/구매" value={`${usage.freeUsed}/${usage.freeLimit} · ${usage.purchasedUsed}/${usage.purchasedPasses}`} />
+          <Metric label="브랜드 비교" value={`${brandComparison.length}개`} />
+          <Metric label="제휴 상태" value="실제 계약 전 미표시" />
+        </div>
+        <div className="candidate-list">
+          {brandRecords.map((record) => (
+            <article
+              key={record.brandId}
+              className={`candidate-card ${brandSelected?.brandId === record.brandId ? 'selected' : ''}`}
+              onClick={() => setBrandSelected(record)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  setBrandSelected(record);
+                }
+              }}
+            >
+              <strong>{record.brandName}</strong>
+              <p>{record.industryName} · {record.category}</p>
+              <div className="candidate-metrics">
+                <span>{record.sourceMeta.source.toUpperCase()}</span>
+                <span>{record.sourceMeta.isEstimated ? '추정' : '실데이터'}</span>
+                <span>기준일 {record.sourceMeta.basisDate}</span>
+                <span>신뢰도 {record.sourceMeta.reliability}/100</span>
+                <span>{record.isPartner ? record.partnershipType : '비제휴'}</span>
+              </div>
+              <p className="candidate-note">{record.note}</p>
+            </article>
+          ))}
+        </div>
+        {brandSelected && (
+          <article className="card brand-detail-card">
+            <span className="eyebrow">브랜드 상세</span>
+            <h3>{brandSelected.brandName}</h3>
+            <p>{brandSelected.industryName} · {brandSelected.category}</p>
+            <div className="grid two-col">
+              <div className="mini-plan">
+                <strong>가맹비</strong>
+                <span>{brandSelected.franchiseFee === null ? '데이터 없음' : formatWon(brandSelected.franchiseFee)}</span>
+              </div>
+              <div className="mini-plan">
+                <strong>교육비</strong>
+                <span>{brandSelected.educationFee === null ? '데이터 없음' : formatWon(brandSelected.educationFee)}</span>
+              </div>
+              <div className="mini-plan">
+                <strong>보증금</strong>
+                <span>{brandSelected.deposit === null ? '데이터 없음' : formatWon(brandSelected.deposit)}</span>
+              </div>
+              <div className="mini-plan">
+                <strong>기타비용</strong>
+                <span>{brandSelected.otherCost === null ? '데이터 없음' : formatWon(brandSelected.otherCost)}</span>
+              </div>
+            </div>
+            <p>총 초기비용 {brandSelected.totalStartupCost ? `${formatWon(brandSelected.totalStartupCost.min)}~${formatWon(brandSelected.totalStartupCost.max)} · 기준 ${formatWon(brandSelected.totalStartupCost.base)}` : '데이터 없음'}</p>
+            <p>제휴 상태 {brandSelected.isPartner ? brandSelected.partnershipType : '비제휴'}</p>
+            <p>데이터 출처 {brandSelected.sourceMeta.label} · 기준일 {brandSelected.sourceMeta.basisDate}</p>
+            <p className="mock-label">{brandSelected.note}</p>
+          </article>
+        )}
+        <div className="subsection">
+          <h3>브랜드 비교</h3>
+          <p className="mock-label">최대 3개 브랜드를 비교합니다.</p>
+          <div className="comparison-grid">
+            {brandComparison.map((row) => (
+              <article key={row.brandId} className="comparison-card">
+                <strong>{row.brandName}</strong>
+                <p>가맹비 {row.fee === null ? '데이터 없음' : formatWon(row.fee)}</p>
+                <p>교육비 {row.educationFee === null ? '데이터 없음' : formatWon(row.educationFee)}</p>
+                <p>보증금 {row.deposit === null ? '데이터 없음' : formatWon(row.deposit)}</p>
+                <p>기타비용 {row.otherCost === null ? '데이터 없음' : formatWon(row.otherCost)}</p>
+                <p>총 초기비용 {row.totalStartupCost === null ? '데이터 없음' : formatWon(row.totalStartupCost)}</p>
+                <p>보유자금 차이 {formatDelta(row.capitalGap)}</p>
+                <p>제휴 상태 {row.isPartner ? row.partnershipType : '비제휴'}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   function renderCompare() {
     if (!comparison) {
       return (
@@ -938,6 +1175,9 @@ function App() {
           <button type="button" className="quick-button" onClick={onCompare}>
             지역 비교
           </button>
+          <button type="button" className="quick-button" onClick={() => onBrandBrowse()}>
+            창업 브랜드 찾아보기
+          </button>
         </section>
 
         <section className="banner-row">
@@ -976,6 +1216,7 @@ function App() {
               <span className="eyebrow">제휴 고지</span>
               <p>운영 배너와 제휴 고지는 실제 운영에서 필요한 전환용 문구입니다. 광고 ID가 없으면 미등록 상태로 유지하고 임의 생성하지 않습니다.</p>
             </section>
+            {getRemainingAnalyses(usage) <= 0 && renderEntitlementCard()}
           </>
         )}
 
@@ -983,11 +1224,13 @@ function App() {
           <>
             {renderAnalysisHeader()}
             {renderWizardStep()}
+            {getRemainingAnalyses(usage) <= 0 && renderEntitlementCard()}
           </>
         )}
 
         {screen === 'search' && renderSearch()}
         {screen === 'compare' && renderCompare()}
+        {screen === 'brand' && renderBrand()}
       </main>
     </AppErrorBoundary>
   );
