@@ -9,7 +9,7 @@ import type {
 } from '../../types/startup';
 import { readCache, writeCache } from '../cache';
 import { resolveWithFallback } from '../fallback';
-import { getRegionStatistics } from '../statistics';
+import { getRegionStatistics, resolveRegionStatistics } from '../statistics';
 
 type DistrictApiPayload = {
   depositPerPyeong?: number;
@@ -174,6 +174,7 @@ async function fetchRealDistrict(inputs: StartupInputs, profile: IndustryProfile
     throw new Error('real district api returned an invalid payload');
   }
   const regional = fallbackDistrictContext(inputs, profile);
+  const liveRegionStatistics = await resolveRegionStatistics(inputs.province, inputs.district);
   const context: CommercialDistrictContext = {
     ...regional,
     sourceMeta: sourceMeta('real', '소상공인시장진흥공단 상가(상권)정보', '실데이터 응답', false, payload.reliability ?? 91, payload.sourceDate ?? TODAY),
@@ -186,7 +187,8 @@ async function fetchRealDistrict(inputs: StartupInputs, profile: IndustryProfile
     premiumEstimate: payload.premiumEstimate ?? regional.premiumEstimate,
     competitorExamples: payload.competitorExamples?.length ? payload.competitorExamples : regional.competitorExamples,
     notes: payload.summary ?? regional.notes,
-    updatedAt: payload.sourceDate ?? regional.updatedAt
+    updatedAt: payload.sourceDate ?? regional.updatedAt,
+    regionStatistics: liveRegionStatistics
   };
 
   writeCache(cacheKey, 'real', context);

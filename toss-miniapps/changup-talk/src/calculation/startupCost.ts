@@ -63,6 +63,26 @@ function deliveryAdjustment(inputs: StartupInputs): number {
   return 1 + delivery * 0.1;
 }
 
+function buildSalesMultiplier(
+  context: Awaited<ReturnType<typeof resolveCommercialDistrictContext>>,
+  profile: IndustryProfile,
+  area: number
+): number {
+  const regionStats = context.regionStatistics;
+  const demandSignal = 0.84
+    + (context.demandIndex - 1) * 0.22
+    + (context.footTrafficIndex - 1) * 0.14
+    + (regionStats.floatingPopulation / 100000) * 0.08
+    + (regionStats.householdDensity / 10000) * 0.02
+    + (regionStats.commercialDensity / 100) * 0.015;
+  const competitionPenalty = 1 - Math.max(0, context.competitionIndex - 1) * 0.14;
+  const areaAdjustment = 0.9 + Math.min(0.12, Math.max(0, area / profile.defaultArea - 1) * 0.05);
+  const fitAdjustment = 0.92 + profile.fitStrength / 500;
+  const accessAdjustment = context.vacancyRate > 0.12 ? 0.96 : 1;
+
+  return clamp(demandSignal * competitionPenalty * areaAdjustment * fitAdjustment * accessAdjustment, 0.72, 1.28);
+}
+
 export function buildConfidence(
   contextSource: number,
   rentSource: number,
@@ -79,7 +99,12 @@ export function buildConfidence(
   const competition = clamp((contextSource + statsSource) / 2, 32, 97);
   const demand = clamp(statsSource + (selectedArea(inputs, profile) <= profile.defaultArea ? 2 : 0), 28, 96);
   const startupCost = clamp(60 + overrideBoost + (costOverridden ? 16 : 0), 34, 98);
-  const salesForecast = clamp((demand * 0.42) + (competition * 0.16) + (profile.fitStrength * 0.28) + (profile.variableCostRate <= 0.25 ? 8 : 0), 26, 90);
+  const sourcePenalty = (contextSource < 90 ? 5 : 0) + (rentSource < 90 ? 3 : 0) + (statsSource < 85 ? 6 : 0) + (franchiseSource < 90 ? 2 : 0);
+  const salesForecast = clamp(
+    48 + (demand - 50) * 0.22 + (competition - 50) * 0.08 + (profile.fitStrength - 70) * 0.16 + (profile.variableCostRate <= 0.25 ? 2 : 0) - sourcePenalty,
+    32,
+    84
+  );
   const overall = clamp(
     rent * 0.2 + competition * 0.18 + demand * 0.22 + startupCost * 0.2 + salesForecast * 0.2 + franchiseSource * 0.02,
     18,
@@ -178,6 +203,7 @@ function buildBreakdownAndBands(
   const area = selectedArea(inputs, profile);
   const areaScale = Math.max(0.72, area / profile.defaultArea);
   const operatingScale = staffMultiplier(inputs, profile) * deliveryAdjustment(inputs);
+  const salesMultiplier = buildSalesMultiplier(context, profile, area);
 
   const depositBase = applyOverride(rentSnapshot.depositPerPyeong * area, inputs.actualQuotes.actualDeposit);
   const rentBase = applyOverride(rentSnapshot.monthlyRentPerPyeong * area, inputs.actualQuotes.actualMonthlyRent);
@@ -190,20 +216,24 @@ function buildBreakdownAndBands(
   const franchiseFee = franchiseSnapshot.available ? franchiseSnapshot.fee : 0;
   const educationFee = franchiseSnapshot.educationFee || profile.educationFee;
   const laborCost = applyOverride(profile.laborBaseCost * Math.max(0.7, selectedStaff(inputs) / Math.max(1, profile.requiredStaff + 0.5)), inputs.actualQuotes.actualLaborCost);
+  const employerBurden = laborCost * clamp(0.12 + selectedStaff(inputs) * 0.01, 0.12, 0.2);
   const utilities = profile.utilitiesBaseCost * (0.9 + areaScale * 0.2);
   const managementFee = profile.managementBaseCost * (0.95 + context.sourceMeta.reliability / 150);
   const marketingCost = profile.marketingBaseCost * (0.9 + context.demandIndex * 0.08);
   const otherMonthlyCost = profile.otherMonthlyCost * (0.9 + context.competitionIndex * 0.05);
-  const workingCapital = (rentBase + laborCost + utilities + managementFee + marketingCost + otherMonthlyCost) * 3;
+  const workingCapital = (rentBase + laborCost + employerBurden + utilities + managementFee + marketingCost + otherMonthlyCost) * 3;
   const otherCost = profile.otherSetupCost + (context.premiumAvailable ? context.premiumEstimate! * 0.05 : 0);
   const totalInvestment = depositBase + premiumBase + interiorBase + equipmentBase + furnitureBase + inventoryBase + licenseCost + franchiseFee + educationFee + workingCapital + otherCost;
-  const monthlyFixedCost = rentBase + laborCost + utilities + managementFee + marketingCost + otherMonthlyCost;
+  const monthlyFixedCost = rentBase + laborCost + employerBurden + utilities + managementFee + marketingCost + otherMonthlyCost;
   const variableCostRate = clamp(
-    profile.variableCostRate - (inputs.deliveryRatio / 100) * 0.03 + (selectedStaff(inputs) <= 1 ? -0.02 : 0.01),
+    profile.variableCostRate
+      + 0.018
+      + (inputs.deliveryRatio / 100) * (profile.group === '배달 전문점' ? 0.04 : 0.015)
+      - (selectedStaff(inputs) <= 1 ? 0.02 : 0.01),
     0.05,
     0.78
   );
-  const expectedSales = profile.salesPerPyeong * area * context.demandIndex * operatingScale;
+  const expectedSales = profile.salesPerPyeong * area * salesMultiplier * operatingScale;
   const variableCost = expectedSales * variableCostRate;
   const breakEvenSales = calculateBreakEvenSales(monthlyFixedCost, variableCostRate);
   const operatingProfit = expectedSales - variableCost - monthlyFixedCost;
@@ -229,7 +259,7 @@ function buildBreakdownAndBands(
     totalInvestment: band(totalInvestment, confidence.overall, 0.26, 0.1)
   };
 
-  const salesBand = band(expectedSales, confidence.salesForecast, 0.24, 0.08);
+  const salesBand = band(expectedSales, confidence.salesForecast, 0.32, 0.14);
   const capitalGap = inputs.availableCapital - totalInvestment;
   const risks: string[] = [];
   if (capitalGap < 0) risks.push(`보유자금이 ${formatCompactWon(Math.abs(capitalGap))} 부족합니다.`);
@@ -237,6 +267,7 @@ function buildBreakdownAndBands(
   if (context.competitionIndex > 1.15) risks.push('경쟁 과밀이 예상됩니다.');
   if (selectedStaff(inputs) > 1 && profile.requiredStaff <= 1) risks.push('인건비 부담이 낮지 않습니다.');
   if (profile.variableCostRate > 0.4) risks.push('낮은 마진 구조라 매출 방어가 중요합니다.');
+  if (paybackMonths !== null && paybackMonths < 12) risks.push('회수기간이 12개월 미만입니다. 높은 매출 가정을 전제로 한 결과입니다.');
   if (paybackMonths !== null && paybackMonths > 36) risks.push('투자회수기간이 길어질 수 있습니다.');
   if (confidence.overall < 60) risks.push('데이터 신뢰도가 낮아 실제 견적 확인이 필요합니다.');
 

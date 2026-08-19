@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/services/config', () => ({
   APP_ENV: {
@@ -19,6 +19,8 @@ vi.mock('../src/services/config', () => ({
 
 import { buildAlternativeRecommendations, calculateStartupAnalysis } from '../src/calculation/startupCost';
 import { getIndustryProfile } from '../src/data/industries';
+import { resolveCommercialDistrictContext } from '../src/services/commercialDistrict';
+import { resolveRegionStatistics } from '../src/services/statistics';
 import type { StartupInputs } from '../src/types/startup';
 
 function createResponse(payload: unknown, ok = true, status = 200) {
@@ -187,6 +189,11 @@ function installLiveFetchMock() {
 
 beforeEach(() => {
   installLiveFetchMock();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('live analysis integration', () => {
@@ -360,5 +367,143 @@ describe('live analysis integration', () => {
 
     expect(result.confidence.reasonSummary).toHaveLength(5);
     expect(result.dataTrace.every((item) => typeof item.reliability === 'number')).toBe(true);
+  });
+
+  it('marks SBDC district data as real when the live payload is valid', async () => {
+    const profile = getIndustryProfile('cafe');
+    const result = await resolveCommercialDistrictContext(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }), profile);
+
+    expect(result.sourceMeta.source).toBe('real');
+    expect(result.competitorExamples.length).toBeGreaterThan(0);
+    expect(result.sourceMeta.isEstimated).toBe(false);
+  });
+
+  it('marks KOSIS region statistics as real when the live payload is valid', async () => {
+    const result = await resolveRegionStatistics('서울특별시', '강남구');
+
+    expect(result.source).toBe('real');
+    expect(result.sourceMeta.source).toBe('real');
+    expect(result.floatingPopulation).toBeGreaterThan(0);
+  });
+
+  it('keeps the final analysis trace real across SBDC, REB, FTC, and KOSIS', async () => {
+    const profile = getIndustryProfile('cafe');
+    const result = await calculateStartupAnalysis(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }), profile);
+
+    expect(result.dataTrace.map((item) => item.source)).toEqual(['real', 'real', 'real', 'real']);
+    expect(result.confidence.overall).toBeGreaterThan(70);
+  });
+
+  it('changes the final analysis numbers between Cheonan and Gangnam', async () => {
+    const profile = getIndustryProfile('cafe');
+    const cheonan = await calculateStartupAnalysis(buildInputs({
+      province: '충청남도',
+      district: '천안시',
+      neighborhood: '불당동',
+      commercialArea: '불당 상권'
+    }), profile);
+    const gangnam = await calculateStartupAnalysis(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }), profile);
+
+    expect(cheonan.breakdown.monthlyRent).not.toBe(gangnam.breakdown.monthlyRent);
+    expect(cheonan.breakdown.expectedSales).not.toBe(gangnam.breakdown.expectedSales);
+    expect(cheonan.confidence.overall).not.toBe(gangnam.confidence.overall);
+  });
+
+  it('falls back to regional SBDC data when the district payload is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/commercial-district')) {
+        return createResponse({});
+      }
+      return createResponse({});
+    }));
+
+    const profile = getIndustryProfile('cafe');
+    const result = await resolveCommercialDistrictContext(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }), profile);
+
+    expect(result.sourceMeta.source).toBe('regional');
+  });
+
+  it('falls back to regional KOSIS data when the statistics payload is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/regional-statistics')) {
+        return createResponse({});
+      }
+      return createResponse({});
+    }));
+
+    const result = await resolveRegionStatistics('서울특별시', '강남구');
+
+    expect(result.source).toBe('regional');
+  });
+
+  it('lowers sales confidence when only modeled demand is available', async () => {
+    const profile = getIndustryProfile('cafe');
+    const result = await calculateStartupAnalysis(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }), profile);
+
+    expect(result.confidence.salesForecast).toBeLessThan(result.confidence.rent);
+    expect(result.confidence.salesForecast).toBeLessThan(80);
+  });
+
+  it('adds a payback warning when the modeled payback period is short', async () => {
+    const profile = getIndustryProfile('cafe');
+    const result = await calculateStartupAnalysis(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권',
+      areaPyeong: 30,
+      actualQuotes: {
+        actualMonthlyRent: 950000,
+        actualDeposit: 5000000,
+        actualInteriorCost: 6000000,
+        actualEquipmentCost: 7000000,
+        actualLaborCost: 1500000
+      }
+    }), profile);
+
+    expect(result.breakdown.paybackMonths).not.toBeNull();
+    expect(result.breakdown.paybackMonths as number).toBeLessThan(12);
+    expect(result.risks.some((risk) => risk.includes('회수기간이 12개월 미만'))).toBe(true);
+  });
+
+  it('keeps actual monthly rent overrides in the final analysis', async () => {
+    const profile = getIndustryProfile('cafe');
+    const result = await calculateStartupAnalysis(buildInputs({
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권',
+      actualQuotes: { actualMonthlyRent: 2100000 }
+    }), profile);
+
+    expect(result.breakdown.monthlyRent).toBe(2100000);
+    expect(result.costBand.monthlyRent.base).toBe(2100000);
   });
 });

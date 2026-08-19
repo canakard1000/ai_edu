@@ -99,7 +99,7 @@ describe('service adapters', () => {
 
     expect(result.sourceMeta.source).toBe('real');
     expect(result.depositPerPyeong).toBe(1500000);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to regional district data when the response is empty', async () => {
@@ -398,4 +398,3 @@ describe('service adapters', () => {
     expect(PUBLIC_API_SOURCES[2].envVars).toContain('VITE_KOSIS_API_KEY');
   });
 });
-

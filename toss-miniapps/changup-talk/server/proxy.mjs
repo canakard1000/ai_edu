@@ -33,6 +33,7 @@ const ftcBrandByIndustry = {
   pizza: 'BRD_20080100007',
   burger: 'BRD_20080100007'
 };
+const upstreamResponseCache = new Map();
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -111,6 +112,10 @@ function withCors(res) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function hashString(input) {
@@ -212,7 +217,9 @@ function extractTotalCount(payload) {
   return null;
 }
 
-async function fetchJson(url, headers = {}) {
+const FETCH_RETRY_DELAYS_MS = [1500, 4500, 12000];
+
+async function fetchJson(url, headers = {}, attempt = 0) {
   const response = await fetch(url, {
     headers: {
       accept: 'application/json, text/xml;q=0.9, */*;q=0.8',
@@ -221,6 +228,39 @@ async function fetchJson(url, headers = {}) {
   });
   const contentType = response.headers.get('content-type') || '';
   const body = await response.text();
+  if (response.ok) {
+    upstreamResponseCache.set(url, {
+      contentType,
+      body
+    });
+  } else if (response.status === 429 || response.status >= 500) {
+    const cached = upstreamResponseCache.get(url);
+    if (cached) {
+      let cachedJson = null;
+      if (/json/i.test(cached.contentType) || cached.body.trim().startsWith('{') || cached.body.trim().startsWith('[')) {
+        try {
+          cachedJson = JSON.parse(cached.body);
+        } catch {
+          cachedJson = null;
+        }
+      }
+      return {
+        response: {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (name) => (String(name).toLowerCase() === 'content-type' ? cached.contentType : null)
+          }
+        },
+        body: cached.body,
+        json: cachedJson
+      };
+    }
+  }
+  if ((response.status === 429 || response.status >= 500) && attempt < FETCH_RETRY_DELAYS_MS.length) {
+    await sleep(FETCH_RETRY_DELAYS_MS[attempt]);
+    return fetchJson(url, headers, attempt + 1);
+  }
   let json = null;
   if (/json/i.test(contentType) || body.trim().startsWith('{') || body.trim().startsWith('[')) {
     try {
@@ -577,11 +617,17 @@ async function handleRegionalStatistics(url, res) {
       return kosisSearchTerms.some((term) => text.includes(term.toLowerCase()));
     });
     const totalCount = extractTotalCount(payload) ?? rows.length;
+    const currentYear = new Date().getFullYear();
     const latestYear = rows
       .map((row) => firstString(row, ['END_PRD_DE', 'STRT_PRD_DE', 'PRD_DE']))
-      .filter(Boolean)
-      .sort()
-      .at(-1) || '2026-08-19';
+      .flatMap((value) => {
+        if (!value) return [];
+        const match = value.match(/(20\d{2})/);
+        return match ? [Number(match[1])] : [];
+      })
+      .filter((year) => year >= 2000 && year <= currentYear)
+      .sort((left, right) => left - right)
+      .at(-1) || currentYear;
     const signal = keywordRows.length > 0 ? keywordRows.length : Math.max(1, rows.length);
     const floatingPopulation = 18000 + signal * 4200 + (province.includes('서울') ? 12000 : 0) + (district.includes('강남') ? 8000 : 0);
     const householdDensity = 800 + signal * 180 + (province.includes('서울') ? 450 : 120);
@@ -593,8 +639,8 @@ async function handleRegionalStatistics(url, res) {
 
     sendJson(res, 200, {
       source: 'kosis',
-      referenceDate: latestYear,
-      sourceDate: latestYear,
+      referenceDate: String(latestYear),
+      sourceDate: String(latestYear),
       regionLevel: district ? '시군구' : '시도',
       isRealData: true,
       confidence,
