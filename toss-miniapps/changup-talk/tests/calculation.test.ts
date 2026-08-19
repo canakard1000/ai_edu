@@ -287,7 +287,13 @@ describe('region and comparison', () => {
   it('reflects region differences in rent and competition', async () => {
     const profile = getIndustryProfile('cafe');
     const left = await calculateStartupAnalysis({ ...baseInputs, district: '천안시', neighborhood: '불당동', commercialArea: '불당 상권' }, profile);
-    const right = await calculateStartupAnalysis({ ...baseInputs, district: '서울특별시 강남구', neighborhood: '역삼동', commercialArea: '강남역 상권' }, profile);
+    const right = await calculateStartupAnalysis({
+      ...baseInputs,
+      province: '서울특별시',
+      district: '강남구',
+      neighborhood: '역삼동',
+      commercialArea: '강남역 상권'
+    }, profile);
 
     expect(left.breakdown.monthlyRent).not.toBe(right.breakdown.monthlyRent);
     expect(left.context.competitionIndex).not.toBe(right.context.competitionIndex);
