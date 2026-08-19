@@ -41,6 +41,17 @@ function regionalStatistics(province: string, district: string): RegionStatistic
   };
 }
 
+function hasValidStatisticsPayload(payload: Partial<RegionStatistics>): boolean {
+  return [
+    payload.floatingPopulation,
+    payload.householdDensity,
+    payload.commercialDensity,
+    payload.youngPopulationRate,
+    payload.apartmentDensity,
+    payload.businessDensity
+  ].some((value) => typeof value === 'number' && Number.isFinite(value));
+}
+
 async function fetchRealStatistics(province: string, district: string): Promise<RegionStatistics> {
   const apiUrl = APP_ENV.kosisApiUrl || APP_ENV.proxyBaseUrl;
   if (!apiUrl) {
@@ -56,6 +67,9 @@ async function fetchRealStatistics(province: string, district: string): Promise<
   }
 
   const payload = await response.json() as Partial<RegionStatistics> & { sourceDate?: string; reliability?: number };
+  if (!hasValidStatisticsPayload(payload)) {
+    throw new Error('real statistics api returned an invalid payload');
+  }
   const result: RegionStatistics = {
     source: 'real',
     sourceMeta: meta('real', payload.reliability ?? 92, 'KOSIS 지역 통계', '실데이터 응답', false, payload.sourceDate ?? TODAY),

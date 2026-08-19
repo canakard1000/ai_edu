@@ -75,6 +75,17 @@ function sourceMeta(source: SourceMeta['source'], label: string, details: string
   };
 }
 
+function hasValidDistrictPayload(payload: DistrictApiPayload): boolean {
+  return [
+    payload.depositPerPyeong,
+    payload.monthlyRentPerPyeong,
+    payload.competitionIndex,
+    payload.demandIndex,
+    payload.footTrafficIndex,
+    payload.vacancyRate
+  ].some((value) => typeof value === 'number' && Number.isFinite(value));
+}
+
 function buildRegionalStatistics(inputs: StartupInputs, _profile: IndustryProfile): RegionalStatisticsSnapshot {
   const regionStats = getRegionStatistics(inputs.province, inputs.district);
   return {
@@ -159,6 +170,9 @@ async function fetchRealDistrict(inputs: StartupInputs, profile: IndustryProfile
   }
 
   const payload = (await response.json()) as DistrictApiPayload & { sourceDate?: string; reliability?: number; summary?: string };
+  if (!hasValidDistrictPayload(payload)) {
+    throw new Error('real district api returned an invalid payload');
+  }
   const regional = fallbackDistrictContext(inputs, profile);
   const context: CommercialDistrictContext = {
     ...regional,

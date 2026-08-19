@@ -13,10 +13,6 @@ interface ImportMetaEnv {
   readonly VITE_REB_API_KEY?: string;
   readonly VITE_KOSIS_API_KEY?: string;
   readonly VITE_FTC_API_KEY?: string;
-  readonly VITE_COMMERCIAL_DISTRICT_API_KEY?: string;
-  readonly VITE_RENT_API_KEY?: string;
-  readonly VITE_STATISTICS_API_KEY?: string;
-  readonly VITE_FRANCHISE_API_KEY?: string;
 }
 
 interface ImportMeta {

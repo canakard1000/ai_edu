@@ -943,8 +943,8 @@ function App() {
         <section className="banner-row">
           <article className="mini-banner">
             <span className="eyebrow">운영 배너</span>
-            <strong>{APP_ENV.adGroupId}</strong>
-            <p>실제 운영 전환 시에는 운영용 광고 ID를 환경변수로만 주입하세요. 테스트 광고 ID는 넣지 않습니다.</p>
+            <strong>{APP_ENV.adGroupId || '운영 ID 미등록'}</strong>
+            <p>실제 운영 전환 시에는 운영용 광고 ID를 환경변수로만 주입하세요. 임의 생성은 하지 않습니다.</p>
           </article>
           <article className="mini-banner">
             <span className="eyebrow">홈 복귀</span>
@@ -974,7 +974,7 @@ function App() {
             </section>
             <section className="card">
               <span className="eyebrow">제휴 고지</span>
-              <p>운영 배너와 제휴 고지는 실제 운영에서 필요한 전환용 문구입니다. 광고 ID가 없으면 TODO 상태로 남겨 두고 임의 생성하지 않습니다.</p>
+              <p>운영 배너와 제휴 고지는 실제 운영에서 필요한 전환용 문구입니다. 광고 ID가 없으면 미등록 상태로 유지하고 임의 생성하지 않습니다.</p>
             </section>
           </>
         )}

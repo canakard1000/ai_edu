@@ -17,6 +17,13 @@ function meta(source: RentSnapshot['source'], reliability: number, label: string
   return { source, reliability, label, details, isEstimated, basisDate };
 }
 
+function hasValidRentPayload(payload: { depositPerPyeong?: number; monthlyRentPerPyeong?: number }): boolean {
+  return typeof payload.depositPerPyeong === 'number'
+    && Number.isFinite(payload.depositPerPyeong)
+    || typeof payload.monthlyRentPerPyeong === 'number'
+    && Number.isFinite(payload.monthlyRentPerPyeong);
+}
+
 async function fetchRealRent(context: CommercialDistrictContext): Promise<RentSnapshot> {
   const apiUrl = APP_ENV.rebApiUrl || APP_ENV.proxyBaseUrl;
   if (!apiUrl) {
@@ -32,6 +39,9 @@ async function fetchRealRent(context: CommercialDistrictContext): Promise<RentSn
   }
 
   const payload = await response.json() as { depositPerPyeong?: number; monthlyRentPerPyeong?: number; sourceDate?: string };
+  if (!hasValidRentPayload(payload)) {
+    throw new Error('real rent api returned an invalid payload');
+  }
   const snapshot: RentSnapshot = {
     source: 'real',
     sourceMeta: meta('real', 93, '한국부동산원 상업용부동산 임대 데이터', '실데이터 응답', false, payload.sourceDate ?? TODAY),

@@ -29,6 +29,14 @@ function fallbackFranchise(profile: IndustryProfile): FranchiseSnapshot {
   };
 }
 
+function hasValidFranchisePayload(payload: Partial<FranchiseSnapshot>): boolean {
+  return [
+    payload.available,
+    payload.fee,
+    payload.educationFee
+  ].some((value) => typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)));
+}
+
 async function fetchRealFranchise(profile: IndustryProfile): Promise<FranchiseSnapshot> {
   const apiUrl = APP_ENV.ftcApiUrl || APP_ENV.proxyBaseUrl;
   if (!apiUrl) {
@@ -44,6 +52,9 @@ async function fetchRealFranchise(profile: IndustryProfile): Promise<FranchiseSn
   }
 
   const payload = await response.json() as Partial<FranchiseSnapshot> & { sourceDate?: string; reliability?: number };
+  if (!hasValidFranchisePayload(payload)) {
+    throw new Error('real franchise api returned an invalid payload');
+  }
   const snapshot: FranchiseSnapshot = {
     source: 'real',
     sourceMeta: meta('real', payload.reliability ?? 92, '공정거래위원회 가맹사업정보', '실데이터 응답', false, payload.sourceDate ?? TODAY),

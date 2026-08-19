@@ -1,7 +1,7 @@
 export const APP_ENV = {
   appName: import.meta.env.VITE_APP_NAME ?? '창업톡',
   baseUrl: import.meta.env.VITE_APP_BASE_URL ?? 'http://localhost:5173',
-  adGroupId: import.meta.env.VITE_TOSS_AD_GROUP_ID ?? 'TODO_REPLACE_WITH_OPERATIONAL_ID',
+  adGroupId: import.meta.env.VITE_TOSS_AD_GROUP_ID ?? '',
   proxyBaseUrl: import.meta.env.VITE_API_PROXY_BASE_URL ?? '',
   sbdcApiKey: import.meta.env.VITE_SBDC_API_KEY ?? '',
   rebApiKey: import.meta.env.VITE_REB_API_KEY ?? '',
