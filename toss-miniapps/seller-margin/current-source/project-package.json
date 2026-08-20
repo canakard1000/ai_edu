@@ -1,0 +1,9 @@
+{
+  "name": "seller-margin-canonical",
+  "private": true,
+  "version": "1.1.1",
+  "type": "module",
+  "scripts": { "build": "vite build && ait build" },
+  "dependencies": { "@apps-in-toss/web-framework": "latest" },
+  "devDependencies": { "@apps-in-toss/cli": "^3.0.3", "vite": "latest" }
+}
