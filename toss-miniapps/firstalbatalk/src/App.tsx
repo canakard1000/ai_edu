@@ -113,6 +113,7 @@ function AppContent() {
   const currentSelectedRecord = useMemo(() => records.find((record) => record.id === selectedRecordId) ?? records[0] ?? null, [records, selectedRecordId]);
   const selectedPost = useMemo(() => LOUNGE_POSTS.find((post) => post.id === selectedPostId) ?? LOUNGE_POSTS[0] ?? null, [selectedPostId]);
   const adGroupId = (import.meta.env.VITE_AD_GROUP_ID as string | undefined)?.trim() || '';
+  const adGroupStatus = adGroupId || 'AD_NOT_CONFIGURED';
   const shareUrl = (import.meta.env.VITE_SHARE_URL as string | undefined)?.trim() || window.location.origin;
 
   function navigate(next: Screen) {
@@ -331,7 +332,7 @@ function AppContent() {
             </button>
           </div>
           <div className="status-grid">
-            <InfoPill label="광고 ID" value={adGroupId || '운영용 광고 ID 미등록'} />
+            <InfoPill label="광고 ID" value={adGroupStatus} />
             <InfoPill label="공유 링크" value={shareUrl} />
             <InfoPill label="문구" value="샘플/예시와 실제 데이터를 구분합니다." />
           </div>
@@ -658,7 +659,7 @@ function AppContent() {
           <StatCard label="오늘 기록" value={`${dashboard.today.count}건`} note="저장된 근무 기록" />
           <StatCard label="이번달 기록" value={`${dashboard.month.count}건`} note="월 합계 반영" />
           <StatCard label="예상 급여" value={formatCurrency(dashboard.month.pay)} note="참고 계산" />
-          <StatCard label="광고 상태" value={adGroupId || '운영용 광고 ID 미등록'} note="임의 테스트 ID 사용 금지" />
+          <StatCard label="광고 상태" value={adGroupStatus} note="임의 테스트 ID 사용 금지" />
         </div>
 
         <div className="card-actions">
@@ -702,7 +703,7 @@ function AppContent() {
       <section className="card notice-card">
         <div className="notice-row">
           <strong>광고</strong>
-          <span>{adGroupId || '운영용 광고 ID 미등록'}</span>
+          <span>{adGroupStatus}</span>
         </div>
         <p>운영용 광고 ID만 사용하며, 테스트 광고 ID는 넣지 않습니다. 실제 값이 없으면 placeholder 상태로 유지합니다.</p>
       </section>
