@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+import aitDevtools from "@apps-in-toss/devtools/unplugin";
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [aitDevtools.vite(), react()],
   test: {
     globals: true,
     environment: 'node'

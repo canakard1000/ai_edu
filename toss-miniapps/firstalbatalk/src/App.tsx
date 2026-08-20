@@ -4,6 +4,7 @@ import { buildDashboard, calculatePay, completeActiveSession, createActiveSessio
 import { loadSnapshot, saveSnapshot } from './storage';
 import type { AppSettings, ChecklistItem, Screen, WorkEntry } from './types';
 import { clamp, formatCurrency, formatDateLabel, formatMinutes, formatTimeLabel, toDateKey } from './utils';
+import { SHARE_DESCRIPTION, SHARE_TITLE, createTossShareLink, resolveSharePath } from './share';
 import './styles.css';
 
 const NAV_ITEMS: Array<{ screen: Screen; label: string }> = [
@@ -113,8 +114,8 @@ function AppContent() {
   const currentSelectedRecord = useMemo(() => records.find((record) => record.id === selectedRecordId) ?? records[0] ?? null, [records, selectedRecordId]);
   const selectedPost = useMemo(() => LOUNGE_POSTS.find((post) => post.id === selectedPostId) ?? LOUNGE_POSTS[0] ?? null, [selectedPostId]);
   const adGroupId = (import.meta.env.VITE_AD_GROUP_ID as string | undefined)?.trim() || '';
-  const adGroupStatus = adGroupId || 'AD_NOT_CONFIGURED';
-  const shareUrl = (import.meta.env.VITE_SHARE_URL as string | undefined)?.trim() || window.location.origin;
+  const adStatus = adGroupId ? 'LIVE' : 'REQUIRED';
+  const sharePath = resolveSharePath(import.meta.env.VITE_SHARE_URL as string | undefined);
 
   function navigate(next: Screen) {
     setScreen(next);
@@ -193,23 +194,26 @@ function AppContent() {
     setChecklist((current) => current.map((item) => ({ ...item, done: value })));
   }
 
-  function shareCurrentState() {
-    const payload = {
-      title: APP_NAME,
-      text: `${settings.profileName}님의 근무 기록과 급여 참고 계산을 확인해 보세요.`,
-      url: shareUrl
-    };
+  async function shareCurrentState() {
+    try {
+      const shareLink = await createTossShareLink(sharePath);
+      const payload = {
+        title: SHARE_TITLE,
+        text: SHARE_DESCRIPTION,
+        url: shareLink
+      };
 
-    if (navigator.share) {
-      void navigator.share(payload).then(() => {
+      if (navigator.share) {
+        await navigator.share(payload);
         setToast('공유 시트를 열었습니다.');
-      });
-      return;
-    }
+        return;
+      }
 
-    void navigator.clipboard.writeText(`${payload.title}\n${payload.text}\n${payload.url}`).then(() => {
+      await navigator.clipboard.writeText(`${payload.title}\n${payload.text}\n${payload.url}`);
       setToast('공유 정보를 복사했습니다.');
-    });
+    } catch {
+      setToast('공유 기능을 사용할 수 없습니다.');
+    }
   }
 
   function selectedRecordSummary(record: WorkEntry) {
@@ -332,8 +336,8 @@ function AppContent() {
             </button>
           </div>
           <div className="status-grid">
-            <InfoPill label="광고 ID" value={adGroupStatus} />
-            <InfoPill label="공유 링크" value={shareUrl} />
+            <InfoPill label="광고 상태" value={adStatus} />
+            <InfoPill label="공유 링크" value="공유 준비 완료" />
             <InfoPill label="문구" value="샘플/예시와 실제 데이터를 구분합니다." />
           </div>
         </section>
@@ -659,7 +663,7 @@ function AppContent() {
           <StatCard label="오늘 기록" value={`${dashboard.today.count}건`} note="저장된 근무 기록" />
           <StatCard label="이번달 기록" value={`${dashboard.month.count}건`} note="월 합계 반영" />
           <StatCard label="예상 급여" value={formatCurrency(dashboard.month.pay)} note="참고 계산" />
-          <StatCard label="광고 상태" value={adGroupStatus} note="임의 테스트 ID 사용 금지" />
+          <StatCard label="광고 상태" value={adStatus} note="운영 광고만 연결" />
         </div>
 
         <div className="card-actions">
@@ -703,9 +707,9 @@ function AppContent() {
       <section className="card notice-card">
         <div className="notice-row">
           <strong>광고</strong>
-          <span>{adGroupStatus}</span>
+          <span>{adStatus}</span>
         </div>
-        <p>운영용 광고 ID만 사용하며, 테스트 광고 ID는 넣지 않습니다. 실제 값이 없으면 placeholder 상태로 유지합니다.</p>
+        <p>운영용 광고만 연결하며, 테스트 광고는 사용하지 않습니다. 실제 값이 없으면 검토가 필요한 상태로 표시합니다.</p>
       </section>
 
       {toast && (

@@ -11,9 +11,17 @@ import {
   describeReferenceNotes,
   getShiftLabel
 } from '../src/logic';
+import { createTossShareLink, resolveSharePath, DEFAULT_SHARE_PATH } from '../src/share';
 import { loadSnapshot } from '../src/storage';
 import type { AppSettings, WorkEntry } from '../src/types';
 import { formatCurrency, formatMinutes, toDateKey, toMonthKey, toWeekStartKey } from '../src/utils';
+import { vi } from 'vitest';
+
+const mockGetTossShareLink = vi.hoisted(() => vi.fn());
+
+vi.mock('@apps-in-toss/web-framework', () => ({
+  getTossShareLink: mockGetTossShareLink
+}));
 
 const SETTINGS: AppSettings = {
   profileName: '테스트',
@@ -193,6 +201,24 @@ describe('firstalbatalk core logic', () => {
 
   test('lounge posts are clearly marked as sample content', () => {
     expect(LOUNGE_POSTS.every((post) => post.isSample)).toBe(true);
+  });
+
+  test('resolveSharePath falls back to the official firstalbatalk deep link', () => {
+    expect(resolveSharePath('')).toBe(DEFAULT_SHARE_PATH);
+    expect(resolveSharePath('  intoss-private://firstalbatalk?_deploymentId=test  ')).toBe('intoss-private://firstalbatalk?_deploymentId=test');
+  });
+
+  test('createTossShareLink uses the Toss SDK result when available', async () => {
+    mockGetTossShareLink.mockResolvedValueOnce('https://share.example/firstalbatalk');
+    await expect(createTossShareLink('intoss://firstalbatalk')).resolves.toBe('https://share.example/firstalbatalk');
+    expect(mockGetTossShareLink).toHaveBeenCalledWith('intoss://firstalbatalk');
+  });
+
+  test('createTossShareLink falls back to the raw path on failure', async () => {
+    mockGetTossShareLink.mockRejectedValueOnce(new Error('no host'));
+    await expect(createTossShareLink('intoss-private://firstalbatalk?_deploymentId=test')).resolves.toBe(
+      'intoss-private://firstalbatalk?_deploymentId=test'
+    );
   });
 
   test.each([
