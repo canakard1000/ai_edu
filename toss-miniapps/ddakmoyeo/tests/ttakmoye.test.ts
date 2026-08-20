@@ -37,7 +37,7 @@ describe('딱모여 안전성 및 공유', () => {
   test('도움 항목을 제공합니다', () => expect(HELP_ITEMS.length).toBeGreaterThanOrEqual(3));
   test('도움 항목은 제목과 본문을 가집니다', () => expect(HELP_ITEMS.every(([title, body]) => Boolean(title && body))).toBe(true));
   test('로컬 저장소가 없어도 안전하게 기본값을 불러옵니다', () => expect(loadSnapshot().groups.length).toBeGreaterThanOrEqual(3));
-  test('공유 앱 경로는 딱모여 공식 딥링크입니다', () => expect(SHARE_PATH).toBe('intoss://ttakmoye'));
+  test('공유 앱 경로는 딱모여 공식 딥링크입니다', () => expect(SHARE_PATH).toBe('intoss://ddakmoyeo'));
   test('공유 제목은 앱 이름입니다', () => expect(SHARE_TITLE).toBe('딱모여'));
   test('공유 설명을 제공합니다', () => expect(SHARE_DESCRIPTION.length).toBeGreaterThan(10));
   test('공유는 Toss SDK 결과를 사용합니다', async () => { mockGetTossShareLink.mockResolvedValueOnce('https://share.example/ttak'); await expect(createShareLink()).resolves.toBe('https://share.example/ttak'); expect(mockGetTossShareLink).toHaveBeenCalledWith(SHARE_PATH); });
