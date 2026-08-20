@@ -30,7 +30,7 @@ const featureContracts = [
   ['market fee comparison', '판매처별 마진 비교'],
   ['naver marketplace fee', '네이버'],
   ['coupang marketplace fee', '쿠팡'],
-  ['smartstore marketplace fee', '토스쇼핑'],
+  ['legacy marketplace option', '토스쇼핑'],
   ['saved calculation action', '이 계산 저장하기'],
   ['saved calculation list', '저장한 계산 보기'],
   ['pro benefits entry point', 'PRO 혜택·이용권 보기'],

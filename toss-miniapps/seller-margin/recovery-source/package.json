@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "lint": "node --check src/back-controller.js && node --check src/back-navigation.js",
-    "typecheck": "node --check src/back-controller.js && node --check src/back-navigation.js",
+    "lint": "node --check src/back-controller.js && node --check src/back-navigation.js && node --check src/runtime-config.js && node --check src/share-flow.js && node --check src/subscription-gateway.js && node --check src/runtime-integrations.js",
+    "typecheck": "node --check src/back-controller.js && node --check src/back-navigation.js && node --check src/runtime-config.js && node --check src/share-flow.js && node --check src/subscription-gateway.js && node --check src/runtime-integrations.js",
     "test": "node --test",
     "build": "vite build"
   },
