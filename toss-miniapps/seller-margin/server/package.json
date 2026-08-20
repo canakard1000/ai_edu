@@ -1,0 +1,14 @@
+{
+  "name": "seller-margin-pro-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "lint": "node --check src/config.js && node --check src/crypto.js && node --check src/notification.js && node --check src/store.js && node --check src/entitlement-service.js && node --check api/toss/subscription-webhook.js && node --check api/pro/entitlement.js",
+    "typecheck": "node --check src/config.js && node --check src/crypto.js && node --check src/notification.js && node --check src/store.js && node --check src/entitlement-service.js && node --check api/toss/subscription-webhook.js && node --check api/pro/entitlement.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
