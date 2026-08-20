@@ -1,0 +1,34 @@
+import { describe, expect, test, vi } from 'vitest';
+import { complete, isComplete, nextStreak, QUIZZES, score, updateAnswer, type DailyProgress } from '../src/logic';
+import { createShareLink, SHARE_PATH } from '../src/share';
+import { DEFAULT_PROGRESS, loadProgress } from '../src/storage';
+const mock=vi.hoisted(()=>vi.fn());vi.mock('@apps-in-toss/web-framework',()=>({getTossShareLink:mock}));
+const base=():DailyProgress=>({dateKey:'2026-08-21',answers:{},streak:0});
+describe('오늘의 두뇌톡 핵심 흐름',()=>{
+ test('일일 문제 3개를 제공합니다',()=>expect(QUIZZES).toHaveLength(3));
+ test('초기 진행은 미완료입니다',()=>expect(isComplete(base())).toBe(false));
+ test('정답 선택을 저장합니다',()=>expect(updateAnswer(base(),'memory',0).answers.memory).toBe(0));
+ test('선택은 다른 답을 보존합니다',()=>expect(updateAnswer(updateAnswer(base(),'memory',0),'focus',1).answers).toEqual({memory:0,focus:1}));
+ test('모든 문제 선택 후 완료입니다',()=>expect(isComplete({dateKey:'',streak:0,answers:{memory:0,focus:1,logic:1}})).toBe(true));
+ test('정답 점수를 계산합니다',()=>expect(score({dateKey:'',streak:0,answers:{memory:0,focus:1,logic:1}})).toBe(3));
+ test('오답은 점수에 포함하지 않습니다',()=>expect(score({dateKey:'',streak:0,answers:{memory:2}})).toBe(0));
+ test('첫 완료는 연속 1일입니다',()=>expect(nextStreak(base(),'2026-08-21')).toBe(1));
+ test('연속 다음날은 기록을 늘립니다',()=>expect(nextStreak({dateKey:'',answers:{},streak:2,lastCompletedDate:'2026-08-20'},'2026-08-21')).toBe(3));
+ test('같은 날 재완료는 기록을 유지합니다',()=>expect(nextStreak({dateKey:'',answers:{},streak:2,lastCompletedDate:'2026-08-21'},'2026-08-21')).toBe(2));
+ test('하루 건너뛰면 연속 기록을 다시 시작합니다',()=>expect(nextStreak({dateKey:'',answers:{},streak:3,lastCompletedDate:'2026-08-19'},'2026-08-21')).toBe(1));
+ test('완료는 오늘 날짜를 저장합니다',()=>expect(complete(base(),'2026-08-21').lastCompletedDate).toBe('2026-08-21'));
+ test('완료는 연속 기록을 설정합니다',()=>expect(complete(base(),'2026-08-21').streak).toBe(1));
+ test('문제 ID는 중복되지 않습니다',()=>expect(new Set(QUIZZES.map(q=>q.id)).size).toBe(QUIZZES.length));
+ test('각 문제는 선택지를 가집니다',()=>expect(QUIZZES.every(q=>q.choices.length===3)).toBe(true));
+ test('정답 인덱스는 선택지 범위에 있습니다',()=>expect(QUIZZES.every(q=>q.answer>=0&&q.answer<q.choices.length)).toBe(true));
+ test('설명문을 제공합니다',()=>expect(QUIZZES.every(q=>q.explanation.length>10)).toBe(true));
+});
+describe('저장과 공유',()=>{
+ test('저장소 부재 시 기본 진행을 불러옵니다',()=>expect(loadProgress()).toEqual(DEFAULT_PROGRESS));
+ test('공유 경로는 공식 brain-talk 딥링크입니다',()=>expect(SHARE_PATH).toBe('intoss://brain-talk-daily-nongame'));
+ test('공유 SDK 결과를 사용합니다',async()=>{mock.mockResolvedValueOnce('https://share.example/brain');await expect(createShareLink()).resolves.toBe('https://share.example/brain');});
+ test('공유 SDK 실패 시 딥링크로 대체합니다',async()=>{mock.mockRejectedValueOnce(new Error('offline'));await expect(createShareLink()).resolves.toBe(SHARE_PATH);});
+ test.each([0,1,2])('문제 %i는 답 선택을 허용합니다',(index)=>expect(updateAnswer(base(),QUIZZES[index].id,index%3).answers[QUIZZES[index].id]).toBe(index%3));
+ test.each([1,2,3,7,14])('연속 %i일 기록을 다음날 증가시킵니다',(streak)=>expect(nextStreak({dateKey:'',answers:{},streak,lastCompletedDate:'2026-08-20'},'2026-08-21')).toBe(streak+1));
+ test.each([0,1,2])('부분 응답 %i개는 미완료입니다',(count)=>{const answers=Object.fromEntries(QUIZZES.slice(0,count).map((quiz)=>[quiz.id,quiz.answer]));expect(isComplete({dateKey:'',answers,streak:0})).toBe(false);});
+});
